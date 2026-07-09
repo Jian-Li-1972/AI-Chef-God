@@ -30,8 +30,8 @@ const recipeSchema = {
 
 // 💡 2. 修正 Fallback 模型隊列與標準 JSON 請求體結構
 async function generateRecipesWithFallback(apiKey: string, contentsArray: any, schema: any) {
-  // 完美兼容：優先使用線上最穩定的 1.5 家族與最新快閃模型
-  const models = ['gemini-1.5-flash', 'gemini-2.5-flash', 'gemini-1.5-pro'];
+  // ✅ 完美兼容：使用 v1beta 接口最標準、相容性最高的官方模型命名結構
+  const models = ['gemini-1.5-flash-latest', 'gemini-1.5-flash', 'gemini-pro'];
   let lastError: any = null;
 
   for (const modelName of models) {
@@ -40,7 +40,7 @@ async function generateRecipesWithFallback(apiKey: string, contentsArray: any, s
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'User-Agent': 'aistudio-build' },
         body: JSON.stringify({ 
-          contents: contentsArray, // 💡 修正：精準傳入對齊後的陣列結構
+          contents: contentsArray, 
           generationConfig: { 
             responseMimeType: "application/json", 
             responseSchema: schema 
@@ -100,7 +100,7 @@ export default async function handler(req: Request) {
         dishName: "本地快取菜譜（AI連線中斷）", 
         description: `底層錯誤原因：${error?.message || error}。請確認此代碼是否已編譯部署成功。`, 
         ingredients: [], 
-        cookingSteps: ["請返回 Vercel 查看最新 Logs"] 
+        cookingSteps: ["請刷新網頁重新上傳圖片試試！"] 
       }] 
     }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   }

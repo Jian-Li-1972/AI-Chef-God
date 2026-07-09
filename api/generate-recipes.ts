@@ -30,8 +30,8 @@ const recipeSchema = {
 
 // 💡 2. 修正 Fallback 模型隊列與標準 JSON 請求體結構
 async function generateRecipesWithFallback(apiKey: string, contentsArray: any, schema: any) {
-  // ✅ 完美兼容：使用 v1beta 接口最標準、相容性最高的官方模型命名結構
-  const models = ['gemini-1.5-flash-latest', 'gemini-1.5-flash', 'gemini-pro'];
+  // ✅ 終極對齊：徹底移除不可用的 gemini-pro，換上 v1beta 100% 通用的萬能快閃模型
+  const models = ['gemini-1.5-flash', 'gemini-2.5-flash'];
   let lastError: any = null;
 
   for (const modelName of models) {
@@ -94,13 +94,15 @@ export default async function handler(req: Request) {
     });
 
   } catch (error: any) {
-    // 💡 5. 如果還是失敗，直接在網頁上打印出真正的底層報錯訊息，拒絕盲盒盲猜！
+    // 💡 5. 優化錯誤字串轉換：如果是物件型態的錯誤，強制轉成純文字，拒絕在前端顯示不出來
+    const errorString = typeof error === 'object' ? (error.message || JSON.stringify(error)) : String(error);
+    
     return new Response(JSON.stringify({ 
       recipes: [{ 
         dishName: "本地快取菜譜（AI連線中斷）", 
-        description: `底層錯誤原因：${error?.message || error}。請確認此代碼是否已編譯部署成功。`, 
+        description: `底層錯誤原因：${errorString}。`, 
         ingredients: [], 
-        cookingSteps: ["請刷新網頁重新上傳圖片試試！"] 
+        cookingSteps: ["請確保在 GitHub 的 api/generate-recipes.ts 裡看得到全新的萬能模型代號，並重新整理網頁再試！"] 
       }] 
     }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   }

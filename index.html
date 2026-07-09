@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-t" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>AI Chef God</title>
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#10B981" />
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Chef God">
+    <link rel="apple-touch-icon" href="/icon-192.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:ital,wght@0,400..700;1,400..700&display=swap" rel="stylesheet">
+    <style>
+      .font-body { font-family: 'Inter', sans-serif; }
+      .font-heading { font-family: 'Lora', serif; }
+      /* Custom scrollbar for a more modern look */
+      ::-webkit-scrollbar { width: 8px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      html.dark ::-webkit-scrollbar-thumb { background: #4a5568; border-radius: 4px; }
+      html.light ::-webkit-scrollbar-thumb { background: #a0aec0; border-radius: 4px; }
+      ::-webkit-scrollbar-thumb:hover { background: #718096; }
+      body {
+        /* Smooth scrolling for better UX */
+        scroll-behavior: smooth;
+        /* Prevent pull-to-refresh on mobile which can feel un-app-like */
+        overscroll-behavior-y: none;
+      }
+      /* Custom list styling for recipe steps */
+      .recipe-steps ol {
+        counter-reset: step-counter;
+        list-style: none;
+        padding-left: 0;
+      }
+      .recipe-steps li {
+        counter-increment: step-counter;
+        display: flex;
+        align-items: flex-start;
+        margin-bottom: 1.5rem; /* More spacing between steps */
+      }
+      .recipe-steps li::before {
+        content: counter(step-counter);
+        font-family: 'Lora', serif;
+        font-weight: bold;
+        font-size: 1.25rem;
+        line-height: 1.5rem;
+        color: white;
+        background-color: var(--theme-color-accent, #10B981); /* Default to green */
+        border-radius: 50%;
+        min-width: 2.5rem;
+        height: 2.5rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 1rem;
+        flex-shrink: 0;
+      }
+      /* Animation for 'Link Copied' tooltip */
+      @keyframes fadeInOut {
+        0%, 100% { opacity: 0; transform: translateY(5px); }
+        10%, 90% { opacity: 1; transform: translateY(0); }
+      }
+      .animate-fade-in-out {
+        animation: fadeInOut 2s ease-in-out forwards;
+      }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "vite": "https://aistudiocdn.com/vite@^7.2.4",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

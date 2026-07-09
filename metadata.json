@@ -1,0 +1,11 @@
+{
+  "name": "Remix: AI Chef God",
+  "description": "Upload a photo of your ingredients, and let the AI Chef God generate three chef-level dishes with step-by-step cooking instructions.",
+  "requestFramePermissions": [
+    "microphone",
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

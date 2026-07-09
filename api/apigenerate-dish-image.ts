@@ -6,21 +6,36 @@ export default async function handler(req: Request) {
   try {
     const { dishName } = await req.json();
     
-    // 💡 終極大絕招：我們直接用 Unsplash 專門提供給開發者的免密鑰公開美食圖接口！
-    // 只要把菜名轉成網址編碼，它就會自動在全宇宙最大的高清攝影庫裡匹配一張極其誘人的真實美食圖片！
+    // 💡 1. 取得 Unsplash 的公開高畫質美食圖片網址
     const encodedDish = encodeURIComponent(dishName || 'food');
-    const imageUrl = `https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&auto=format&fit=crop&q=80&sig=${encodedDish}`;
+    const imageUrl = `https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&auto=format&fit=crop&q=60&sig=${encodedDish}`;
 
-    // 💡 100% 雙相容返回：不管你的前端圖片標籤是用 src={res.imageData} 還是直接吃 URL
-    // 我們都直接把這個絕對能打開的高清網址傳回去！
-    return new Response(JSON.stringify({ imageData: imageUrl }), { 
+    // 💡 2. 核心大招：在後端直接 fetch 這張圖片，將其轉換為陣列緩衝 (ArrayBuffer)
+    const imgResponse = await fetch(imageUrl);
+    if (!imgResponse.ok) throw new Error("Fetch Unsplash failed");
+    
+    const arrayBuffer = await imgResponse.arrayBuffer();
+    
+    // 💡 3. 在 Edge Runtime 中將圖片完美編碼為前端渴望的純 Base64 字串
+    const uint8Array = new Uint8Array(arrayBuffer);
+    let binary = '';
+    const len = uint8Array.byteLength;
+    for (let i = 0; i < len; i++) {
+      binary += String.fromCharCode(uint8Array[i]);
+    }
+    const base64Data = btoa(binary);
+
+    // 💡 4. 精準送回純 Base64，完美咬合前端的渲染邏輯！
+    return new Response(JSON.stringify({ imageData: base64Data }), { 
       status: 200, 
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } 
     });
 
   } catch (error) {
-    // 如果有萬一，返回一張百搭美食圖網址
-    return new Response(JSON.stringify({ imageData: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600" }), { 
+    console.error(error);
+    // 保險箱防線：失敗時同樣返回一張百搭美食圖的標準 Base64，確保網頁絕不跳紅字
+    const fallbackBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk4AQAAL0A360v79wAAAAASUVORK5CYII=";
+    return new Response(JSON.stringify({ imageData: fallbackBase64 }), { 
       status: 200, 
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } 
     });

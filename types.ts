@@ -12,11 +12,15 @@ export interface Recipe {
   ingredients: Ingredient[];
   cookingSteps: string[];
   dishImage?: string;
-  dishImageStatus: 'pending' | 'loaded' | 'failed';
+  dishImageStatus: 'pending' | 'loaded' | 'failed' | 'quota_exceeded';
   cookingTime?: string;
   difficulty?: 'Easy' | 'Medium' | 'Hard';
   cuisine?: string;
   isFavorite?: boolean;
+  servings?: number;
+  rating?: number;
+  ratingCount?: number;
+  userRating?: number;
 }
 
 export interface Settings {

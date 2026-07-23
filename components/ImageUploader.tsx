@@ -100,7 +100,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageSelect, set
         <div className="flex flex-col items-center">
           <UploadIcon className={`h-12 w-12 mb-2 ${themeClasses.icon}`} />
           <p className={`mt-2 text-sm ${themeClasses.textSecondary}`}>
-            <span className={`${themeClasses.icon} font-semibold`}>{t('uploadClick')}</span> {t('uploadDrag')}
+            <span className={`${themeClasses.icon} font-semibold`}>{t('uploadClick')}</span> <span className="hidden sm:inline">{t('uploadDrag')}</span>
           </p>
           <p className={`text-xs ${themeClasses.textSecondary} opacity-70 mt-1`}>{t('uploadFileType')}</p>
         </div>

@@ -1,6 +1,7 @@
 
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { ImageUploader } from './components/ImageUploader';
 import { RecipeCard } from './components/RecipeCard';
 import { RecipeDisplay } from './components/RecipeDisplay';
@@ -11,12 +12,17 @@ import { AuthModal } from './components/AuthModal';
 import { UserActionsModal } from './components/UserActionsModal';
 import { ChangePasswordModal } from './components/ChangePasswordModal';
 import { SavedRecipesModal } from './components/SavedRecipesModal';
+import { VideoPromoModal } from './components/VideoPromoModal';
+import { ChefTipsModal } from './components/ChefTipsModal';
 import { ChefHatIcon } from './components/icons/ChefHatIcon';
+import { SparklesIcon } from './components/icons/SparklesIcon';
 import { SettingsIcon } from './components/icons/SettingsIcon';
 import { UserIcon } from './components/icons/UserIcon';
 import { BookmarkIcon } from './components/icons/BookmarkIcon';
+import { VideoIcon } from './components/icons/VideoIcon';
 import { MicrophoneIcon } from './components/icons/MicrophoneIcon';
 import { SearchIcon } from './components/icons/SearchIcon';
+import { StarIcon } from './components/icons/StarIcon';
 import { generateRecipesFromImage, generateDishImage } from './services/geminiService';
 import { fileToBase64 } from './utils/fileUtils';
 import { getTranslation } from './utils/translations';
@@ -66,11 +72,30 @@ declare global {
   }
 }
 
-// Utility to parse time string like "45 minutes" to a number
+// Utility to parse time string like "45 minutes" or "1 hour" to a number in minutes
 const parseCookingTime = (timeStr?: string): number => {
     if (!timeStr) return Infinity;
-    const match = timeStr.match(/\d+/);
-    return match ? parseInt(match[0], 10) : Infinity;
+    const lowerStr = timeStr.toLowerCase();
+    const match = lowerStr.match(/(\d+)/);
+    if (!match) return Infinity;
+    
+    let value = parseInt(match[1], 10);
+    if (lowerStr.includes('hour') || lowerStr.includes('hr')) {
+        // If it's something like "1 hour 30 minutes", this simple logic might need more work, 
+        // but for "1 hour" or "1.5 hours" it's a start. 
+        // Let's handle "X hour(s) Y minute(s)"
+        const hourMatch = lowerStr.match(/(\d+)\s*h/);
+        const minuteMatch = lowerStr.match(/(\d+)\s*m/);
+        
+        if (hourMatch && minuteMatch) {
+            return parseInt(hourMatch[1], 10) * 60 + parseInt(minuteMatch[1], 10);
+        } else if (hourMatch) {
+            return parseInt(hourMatch[1], 10) * 60;
+        } else if (lowerStr.includes('hour') || lowerStr.includes('hr')) {
+             return value * 60;
+        }
+    }
+    return value;
 };
 
 function App() {
@@ -78,8 +103,8 @@ function App() {
   const [settings, setSettings] = useState<Settings>({
     themeColor: 'green',
     fontFamily: 'sans',
-    language: 'zh-CN',
-    themeMode: 'dark',
+    language: 'en',
+    themeMode: 'light',
   });
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
@@ -94,6 +119,7 @@ function App() {
   const [difficultyFilter, setDifficultyFilter] = useState('all');
   const [timeFilter, setTimeFilter] = useState('all');
   const [cuisineFilter, setCuisineFilter] = useState('all');
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
 
   // Modal states
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -102,21 +128,12 @@ function App() {
   const [isUserActionsModalOpen, setIsUserActionsModalOpen] = useState(false);
   const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
   const [isSavedRecipesModalOpen, setIsSavedRecipesModalOpen] = useState(false);
+  const [isVideoPromoModalOpen, setIsVideoPromoModalOpen] = useState(false);
+  const [isChefTipsModalOpen, setIsChefTipsModalOpen] = useState(false);
 
   // User & Saved Data
   const [user, setUser] = useState<{ name: string } | null>(null);
-  const [savedMenus, setSavedMenus] = useState<Recipe[][]>(() => {
-    try {
-      const saved = localStorage.getItem('chef_god_saved_menus');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  const [isSaveDropdownOpen, setIsSaveDropdownOpen] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const saveDropdownRef = useRef<HTMLDivElement>(null);
+  const [savedMenus, setSavedMenus] = useState<Recipe[][]>([]);
   
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
@@ -125,6 +142,26 @@ function App() {
 
 
   // Effects
+  useEffect(() => {
+    const isAnyModalOpen = isSettingsModalOpen || !!enlargedImageUrl || isAuthModalOpen || isUserActionsModalOpen || isChangePasswordModalOpen || isSavedRecipesModalOpen || isVideoPromoModalOpen || isChefTipsModalOpen;
+    if (isAnyModalOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+  }, [isSettingsModalOpen, enlargedImageUrl, isAuthModalOpen, isUserActionsModalOpen, isChangePasswordModalOpen, isSavedRecipesModalOpen, isVideoPromoModalOpen, isChefTipsModalOpen]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const recipeName = params.get('recipe');
+    if (recipeName && recipes.length > 0) {
+      const recipe = recipes.find(r => r.dishName === recipeName);
+      if (recipe) {
+        setSelectedRecipe(recipe);
+      }
+    }
+  }, [recipes]);
+
   useEffect(() => {
     const root = document.documentElement;
     root.classList.toggle('dark', settings.themeMode === 'dark');
@@ -175,7 +212,7 @@ function App() {
     }
   }, [settings.language, t]);
 
-  const updateRecipeImageAndStatus = useCallback((recipeName: string, imageData: string | null, status: 'loaded' | 'failed') => {
+  const updateRecipeImageAndStatus = useCallback((recipeName: string, imageData: string | null, status: 'loaded' | 'failed' | 'quota_exceeded') => {
     setRecipes(currentRecipes =>
       currentRecipes.map(r =>
         r.dishName === recipeName ? { ...r, dishImage: imageData ?? undefined, dishImageStatus: status } : r
@@ -198,7 +235,9 @@ function App() {
         const recipeToRegenerate = recipes.find(r => r.dishName === recipeName);
         if (recipeToRegenerate) {
             const imageData = await generateDishImage(recipeToRegenerate.dishName, recipeToRegenerate.description);
-             if (imageData) {
+             if (imageData === 'QUOTA_EXCEEDED') {
+                updateRecipeImageAndStatus(recipeToRegenerate.dishName, null, 'quota_exceeded');
+            } else if (imageData) {
                 updateRecipeImageAndStatus(recipeToRegenerate.dishName, imageData, 'loaded');
             } else {
                 updateRecipeImageAndStatus(recipeToRegenerate.dishName, null, 'failed');
@@ -211,8 +250,12 @@ function App() {
     const fetchImages = async () => {
         for (const recipe of recipes) {
             if (recipe.dishImageStatus === 'pending' && !recipe.dishImage) {
+                // Add a small delay between calls to avoid hitting rate limits
+                await new Promise(resolve => setTimeout(resolve, 1000));
                 const imageData = await generateDishImage(recipe.dishName, recipe.description);
-                if (imageData) {
+                if (imageData === 'QUOTA_EXCEEDED') {
+                    updateRecipeImageAndStatus(recipe.dishName, null, 'quota_exceeded');
+                } else if (imageData) {
                     updateRecipeImageAndStatus(recipe.dishName, imageData, 'loaded');
                 } else {
                     updateRecipeImageAndStatus(recipe.dishName, null, 'failed');
@@ -225,40 +268,6 @@ function App() {
         fetchImages();
     }
   }, [recipes, updateRecipeImageAndStatus]);
-
-  // Persist saved menus to localStorage, stripping large base64 images to avoid QuotaExceededError
-  useEffect(() => {
-    try {
-      const sanitizedMenus = savedMenus.map(menu => 
-        menu.map(recipe => {
-          const isBase64 = recipe.dishImage && (recipe.dishImage.startsWith('data:') || recipe.dishImage.length > 500);
-          return {
-            ...recipe,
-            dishImage: isBase64 ? undefined : recipe.dishImage,
-            dishImageStatus: isBase64 ? 'pending' : recipe.dishImageStatus
-          };
-        })
-      );
-      localStorage.setItem('chef_god_saved_menus', JSON.stringify(sanitizedMenus));
-    } catch (e) {
-      console.error('Error saving menus to localStorage', e);
-    }
-  }, [savedMenus]);
-
-  // Close Save dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (saveDropdownRef.current && !saveDropdownRef.current.contains(event.target as Node)) {
-        setIsSaveDropdownOpen(false);
-      }
-    };
-    if (isSaveDropdownOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isSaveDropdownOpen]);
 
   // Handlers
   const handleGenerateRecipes = async () => {
@@ -332,73 +341,11 @@ function App() {
 
   const handleSaveMenu = () => {
     if (recipes.length > 0) {
-      // Deep clone the current recipes to save a distinct snapshot in the library
-      const clonedRecipes = JSON.parse(JSON.stringify(recipes));
-      setSavedMenus(prev => [...prev, clonedRecipes]);
-      alert(t('savedSuccessfully'));
+      setSavedMenus(prev => [...prev, recipes]);
+      // simple feedback
+      alert('Menu saved!');
     }
-  };
-
-  const handleExportCurrentMenu = () => {
-    if (recipes.length === 0) return;
-    const blob = new Blob([JSON.stringify(recipes, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `recipe-menu-${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-  const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const content = e.target?.result as string;
-        const parsed = JSON.parse(content);
-        
-        let importedRecipes: Recipe[] = [];
-        if (Array.isArray(parsed)) {
-          if (parsed.length > 0 && Array.isArray(parsed[0])) {
-            importedRecipes = parsed[0];
-          } else {
-            importedRecipes = parsed;
-          }
-        } else if (parsed && parsed.recipes && Array.isArray(parsed.recipes)) {
-          importedRecipes = parsed.recipes;
-        } else if (parsed && typeof parsed === 'object' && parsed.dishName) {
-          importedRecipes = [parsed];
-        }
-
-        const isValid = importedRecipes.every(r => typeof r.dishName === 'string' && Array.isArray(r.ingredients));
-        if (isValid && importedRecipes.length > 0) {
-          setRecipes(importedRecipes);
-          setSelectedRecipe(importedRecipes[0]);
-          alert(t('menuLoadedSuccessfully'));
-        } else {
-          alert(t('invalidFileFormat'));
-        }
-      } catch (err) {
-        console.error(err);
-        alert(t('errorReadingFile'));
-      }
-    };
-    reader.readAsText(file);
-    event.target.value = '';
-  };
-
-  const handleImportLibrary = (importedLibrary: Recipe[][]) => {
-    setSavedMenus(prev => {
-      const existingTitles = new Set(prev.map(m => m[0]?.dishName));
-      const filteredNew = importedLibrary.filter(m => m.length > 0 && !existingTitles.has(m[0].dishName));
-      return [...prev, ...filteredNew];
-    });
-  };
+  }
 
   const handleLoadMenu = (menu: Recipe[]) => {
     setRecipes(menu);
@@ -415,6 +362,53 @@ function App() {
     setSelectedRecipe(currentSelected =>
         (currentSelected && currentSelected.dishName === dishName) ? { ...currentSelected, isFavorite: !currentSelected.isFavorite } : currentSelected
     );
+  };
+
+  const handleRateRecipe = (dishName: string, rating: number) => {
+    setRecipes(currentRecipes =>
+      currentRecipes.map(r => {
+        if (r.dishName === dishName) {
+          const currentRating = r.rating || 0;
+          const currentCount = r.ratingCount || 0;
+          const oldUserRating = r.userRating || 0;
+          
+          let newCount = currentCount;
+          let newRating = currentRating;
+          
+          if (oldUserRating === 0) {
+            // New rating
+            newCount = currentCount + 1;
+            newRating = (currentRating * currentCount + rating) / newCount;
+          } else {
+            // Updating existing rating
+            newRating = (currentRating * currentCount - oldUserRating + rating) / currentCount;
+          }
+          
+          return { ...r, rating: newRating, ratingCount: newCount, userRating: rating };
+        }
+        return r;
+      })
+    );
+    setSelectedRecipe(currentSelected => {
+      if (currentSelected && currentSelected.dishName === dishName) {
+        const currentRating = currentSelected.rating || 0;
+        const currentCount = currentSelected.ratingCount || 0;
+        const oldUserRating = currentSelected.userRating || 0;
+        
+        let newCount = currentCount;
+        let newRating = currentRating;
+        
+        if (oldUserRating === 0) {
+          newCount = currentCount + 1;
+          newRating = (currentRating * currentCount + rating) / newCount;
+        } else {
+          newRating = (currentRating * currentCount - oldUserRating + rating) / currentCount;
+        }
+        
+        return { ...currentSelected, rating: newRating, ratingCount: newCount, userRating: rating };
+      }
+      return currentSelected;
+    });
   };
   
   const filteredRecipes = useMemo(() => {
@@ -445,22 +439,33 @@ function App() {
             // Cuisine filter
             if (cuisineFilter === 'all') return true;
             return recipe.cuisine?.toLowerCase().includes(cuisineFilter.toLowerCase());
+        })
+        .filter(recipe => {
+            // Favorites filter
+            if (!favoritesOnly) return true;
+            return !!recipe.isFavorite;
         });
-  }, [recipes, searchQuery, difficultyFilter, timeFilter, cuisineFilter]);
+  }, [recipes, searchQuery, difficultyFilter, timeFilter, cuisineFilter, favoritesOnly]);
 
   return (
     <div className={`min-h-screen transition-colors duration-300`}>
-      <header className={`sticky top-0 z-10 shadow-sm border-b ${themeClasses.bgCard} ${themeClasses.border} transition-colors`}>
-        <div className="container mx-auto px-6 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <ChefHatIcon className={`h-8 w-8`} />
-            <h1 className={`text-2xl font-bold font-heading ${themeClasses.textHeader}`}>{t('appTitle')}</h1>
+      <header className={`sticky top-0 z-20 shadow-sm border-b ${themeClasses.bgCard} ${themeClasses.border} transition-colors pt-safe`}>
+        <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-2 sm:py-4 flex justify-between items-center">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <ChefHatIcon className={`h-6 w-6 sm:h-8 sm:w-8`} />
+            <h1 className={`text-lg sm:text-2xl font-bold font-heading ${themeClasses.textHeader} truncate max-w-[150px] sm:max-w-none`}>{t('appTitle')}</h1>
           </div>
-          <div className="flex items-center gap-3">
-            <button onClick={() => setIsSavedRecipesModalOpen(true)} title={t('savedMenus')} className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+          <div className="flex items-center gap-1 sm:gap-3">
+            <button onClick={() => setIsChefTipsModalOpen(true)} title={t('successSecrets')} className="p-2 rounded-full text-yellow-500 hover:bg-yellow-500/10 transition-colors">
+                <SparklesIcon className="h-6 w-6" />
+            </button>
+            <button onClick={() => setIsVideoPromoModalOpen(true)} title={t('generatePromoVideo')} className="p-2 rounded-full text-indigo-500 hover:bg-indigo-500/10 transition-colors">
+                <VideoIcon className="h-6 w-6" />
+            </button>
+            <button onClick={() => setIsSavedRecipesModalOpen(true)} title={t('savedMenus')} className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors hidden sm:flex">
                 <BookmarkIcon className="h-6 w-6" />
             </button>
-            <button onClick={() => setIsSettingsModalOpen(true)} title={t('settings')} className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+            <button onClick={() => setIsSettingsModalOpen(true)} title={t('settings')} className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors hidden sm:flex">
               <SettingsIcon className="h-6 w-6" />
             </button>
             {user ? (
@@ -468,17 +473,17 @@ function App() {
                 <UserIcon className="h-6 w-6" />
               </button>
             ) : (
-              <button onClick={() => setIsAuthModalOpen(true)} className={`text-sm font-semibold ${themeClasses.icon} hover:underline`}>{t('loginRegister')}</button>
+              <button onClick={() => setIsAuthModalOpen(true)} className={`text-sm font-semibold ${themeClasses.icon} hover:underline px-2`}>{t('loginRegister')}</button>
             )}
           </div>
         </div>
       </header>
 
-      <main className="container mx-auto p-4 sm:p-6 lg:p-8 lg:grid lg:grid-cols-5 lg:gap-12">
+      <main className="max-w-screen-2xl mx-auto p-4 sm:p-6 lg:p-8 lg:grid lg:grid-cols-5 lg:gap-12 pb-24 lg:pb-8">
         {/* Left Column */}
-        <div className={`space-y-8 lg:col-span-2 ${selectedRecipe ? 'hidden lg:block' : 'block'}`}>
-          <div className={`p-6 rounded-2xl shadow-lg border ${themeClasses.bgCard} ${themeClasses.border}`}>
-            <h2 className={`text-xl font-bold font-heading mb-4 ${themeClasses.textHeader}`}>{t('appSubtitle')}</h2>
+        <div className={`space-y-6 lg:space-y-8 lg:col-span-2 ${selectedRecipe ? 'hidden lg:block' : 'block'}`}>
+          <div className={`p-5 sm:p-6 rounded-2xl shadow-lg border ${themeClasses.bgCard} ${themeClasses.border}`}>
+            <h2 className={`text-lg sm:text-xl font-bold font-heading mb-4 ${themeClasses.textHeader}`}>{t('appSubtitle')}</h2>
             <ImageUploader onImageSelect={handleImageSelect} settings={settings} t={t} />
             <div className="relative mt-4">
                 <textarea
@@ -513,7 +518,7 @@ function App() {
 
           {recipes.length > 0 && (
             <div className="space-y-4">
-                <div className="flex justify-between items-center gap-4 relative" ref={saveDropdownRef}>
+                <div className="flex justify-between items-center gap-4">
                   <div className="relative flex-grow">
                     <input
                       type="text"
@@ -526,70 +531,13 @@ function App() {
                       <SearchIcon className="h-5 w-5" />
                     </span>
                   </div>
-                  
-                  <div className="flex items-center flex-shrink-0">
-                    <button 
-                      onClick={handleSaveMenu} 
-                      className={`inline-flex items-center gap-2 text-sm font-semibold py-2 px-3 sm:px-4 rounded-l-lg transition-colors border-2 border-r border-current flex-shrink-0 ${themeClasses.icon} hover:bg-gray-200 dark:hover:bg-gray-700 h-[42px]`}
-                      title={t('saveToLibrary')}
-                    >
-                      <BookmarkIcon className="h-5 w-5" />
-                      <span className="hidden sm:inline">{t('saveMenu')}</span>
-                    </button>
-                    <button
-                      onClick={() => setIsSaveDropdownOpen(prev => !prev)}
-                      className={`inline-flex items-center justify-center p-2 rounded-r-lg transition-colors border-2 border-l-0 border-current flex-shrink-0 ${themeClasses.icon} hover:bg-gray-200 dark:hover:bg-gray-700 h-[42px]`}
-                      title={t('moreOptions')}
-                    >
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </button>
-                  </div>
-
-                  {isSaveDropdownOpen && (
-                    <div className={`absolute right-0 top-full mt-2 w-56 rounded-lg shadow-xl border z-20 ${settings.themeMode === 'dark' ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-200 text-black'}`}>
-                      <div className="p-1.5 space-y-1">
-                        <button
-                          onClick={() => {
-                            handleSaveMenu();
-                            setIsSaveDropdownOpen(false);
-                          }}
-                          className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors flex items-center gap-2 ${settings.themeMode === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
-                        >
-                          <BookmarkIcon className="h-4 w-4 text-indigo-500" />
-                          <span>{t('saveToLibrary')}</span>
-                        </button>
-                        <button
-                          onClick={() => {
-                            handleExportCurrentMenu();
-                            setIsSaveDropdownOpen(false);
-                          }}
-                          className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors flex items-center gap-2 ${settings.themeMode === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
-                        >
-                          <svg className="h-4 w-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                          </svg>
-                          <span>{t('saveToDevice')}</span>
-                        </button>
-                        <button
-                          onClick={() => {
-                            fileInputRef.current?.click();
-                            setIsSaveDropdownOpen(false);
-                          }}
-                          className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors flex items-center gap-2 ${settings.themeMode === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
-                        >
-                          <svg className="h-4 w-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                          </svg>
-                          <span>{t('openFromFile')}</span>
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                  <button onClick={handleSaveMenu} className={`inline-flex items-center gap-2 text-sm font-semibold py-2 px-4 rounded-lg transition-colors border-2 flex-shrink-0 ${themeClasses.icon} border-current hover:bg-gray-200 dark:hover:bg-gray-700`}>
+                    <BookmarkIcon className="h-5 w-5" />
+                    <span className="hidden sm:inline">{t('saveMenu')}</span>
+                  </button>
                 </div>
                 {/* Advanced Filters */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div>
                     <label htmlFor="difficulty-filter" className={`block text-xs font-medium ${themeClasses.textSecondary} mb-1`}>{t('difficulty')}</label>
                     <select id="difficulty-filter" value={difficultyFilter} onChange={(e) => setDifficultyFilter(e.target.value)} className={`w-full text-sm p-2 border rounded-lg transition-colors ${themeClasses.input} ${themeClasses.border} ${themeClasses.borderFocus}`}>
@@ -615,10 +563,38 @@ function App() {
                         <option value="chinese">{t('chinese')}</option>
                         <option value="japanese">{t('japanese')}</option>
                         <option value="thai">{t('thai')}</option>
-                        {/* Fix: Use the new 'cuisine_french' translation key. */}
                         <option value="french">{t('cuisine_french')}</option>
                         <option value="italian">{t('italian')}</option>
+                        <option value="indian">{t('indian')}</option>
+                        <option value="mexican">{t('mexican')}</option>
+                        <option value="american">{t('american')}</option>
+                        <option value="korean">{t('korean')}</option>
+                        <option value="mediterranean">{t('mediterranean')}</option>
+                        <option value="middle eastern">{t('middle_eastern')}</option>
+                        <option value="vietnamese">{t('vietnamese')}</option>
+                        <option value="greek">{t('greek')}</option>
+                        <option value="spanish">{t('cuisine_spanish')}</option>
+                        <option value="british">{t('british')}</option>
+                        <option value="german">{t('german')}</option>
+                        <option value="turkish">{t('turkish')}</option>
+                        <option value="brazilian">{t('brazilian')}</option>
+                        <option value="russian">{t('russian')}</option>
+                        <option value="african">{t('african')}</option>
+                        <option value="caribbean">{t('caribbean')}</option>
+                        <option value="lebanese">{t('lebanese')}</option>
+                        <option value="moroccan">{t('moroccan')}</option>
+                        <option value="portuguese">{t('portuguese')}</option>
+                        <option value="scandinavian">{t('scandinavian')}</option>
                     </select>
+                  </div>
+                  <div className="flex flex-col justify-end">
+                    <button 
+                        onClick={() => setFavoritesOnly(!favoritesOnly)}
+                        className={`w-full text-sm p-2 border rounded-lg transition-colors flex items-center justify-center gap-2 h-[38px] ${favoritesOnly ? 'bg-yellow-500/10 border-yellow-500 text-yellow-600 dark:text-yellow-400' : `${themeClasses.input} ${themeClasses.border}`}`}
+                    >
+                        <StarIcon solid={favoritesOnly} className="h-4 w-4" />
+                        <span>{t('favoritesOnly')}</span>
+                    </button>
                   </div>
                 </div>
             </div>
@@ -626,32 +602,6 @@ function App() {
           
           <div className="space-y-4">
             {isLoading && !recipes.length && <Loader />}
-            
-            {!isLoading && recipes.length === 0 && (
-              <div className={`p-8 rounded-2xl border border-dashed text-center flex flex-col items-center justify-center space-y-4 ${themeClasses.bgCard} ${themeClasses.border}`}>
-                <div className="p-3 rounded-full bg-indigo-50 dark:bg-indigo-950/40 text-indigo-500">
-                  <ChefHatIcon className="h-10 w-10 animate-bounce" />
-                </div>
-                <div className="space-y-1 max-w-sm">
-                  <h3 className="font-bold text-lg">{t('emptyStateTitle')}</h3>
-                  <p className={`text-xs ${themeClasses.textSecondary} leading-relaxed`}>
-                    {t('emptyStateSubtitle')}
-                  </p>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className={`inline-flex items-center gap-2 text-sm font-semibold py-2 px-5 rounded-lg transition-all duration-200 border-2 ${themeClasses.icon} border-current hover:bg-gray-150 dark:hover:bg-gray-800 shadow-sm`}
-                  >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                    </svg>
-                    <span>{t('openFromFile')}</span>
-                  </button>
-                </div>
-              </div>
-            )}
-
             {filteredRecipes.length > 0 ? (
                 [...filteredRecipes]
                   .sort((a, b) => (b.isFavorite ? 1 : 0) - (a.isFavorite ? 1 : 0))
@@ -678,44 +628,75 @@ function App() {
         </div>
 
         {/* Right Column */}
-        <div className={`lg:col-span-3 rounded-2xl shadow-lg border lg:sticky top-28 lg:h-[calc(100vh-8.5rem)] ${selectedRecipe ? 'block' : 'hidden lg:block'} ${themeClasses.bgCard} ${themeClasses.border}`}>
-          <RecipeDisplay 
-            recipe={selectedRecipe} 
-            settings={settings} 
-            t={t} 
-            onImageEnlarge={handleImageEnlarge}
-            onBack={() => handleSelectRecipe(null)}
-            onRegenerateImage={selectedRecipe ? () => handleRegenerateImage(selectedRecipe.dishName) : undefined}
-            onSaveToLibrary={handleSaveMenu}
-          />
-        </div>
+        <AnimatePresence>
+          {selectedRecipe && (
+            <motion.div 
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className={`lg:col-span-3 rounded-2xl shadow-lg border lg:sticky lg:top-28 lg:h-[calc(100vh-8.5rem)] fixed inset-0 z-40 lg:relative lg:inset-auto ${themeClasses.bgCard} ${themeClasses.border}`}
+            >
+              <RecipeDisplay 
+                recipe={selectedRecipe} 
+                settings={settings} 
+                t={t} 
+                onImageEnlarge={handleImageEnlarge}
+                onBack={() => handleSelectRecipe(null)}
+                onRegenerateImage={selectedRecipe ? () => handleRegenerateImage(selectedRecipe.dishName) : undefined}
+                onToggleFavorite={selectedRecipe ? () => handleToggleFavorite(selectedRecipe.dishName) : undefined}
+                onRate={selectedRecipe ? (rating) => handleRateRecipe(selectedRecipe.dishName, rating) : undefined}
+              />
+            </motion.div>
+          )}
+          {!selectedRecipe && (
+            <div className="hidden lg:block lg:col-span-3 rounded-2xl shadow-lg border lg:sticky lg:top-28 lg:h-[calc(100vh-8.5rem)] bg-gray-50 dark:bg-gray-900/50 border-dashed border-gray-300 dark:border-gray-700">
+                <RecipeDisplay 
+                    recipe={null} 
+                    settings={settings} 
+                    t={t} 
+                    onImageEnlarge={handleImageEnlarge}
+                    onBack={() => {}}
+                />
+            </div>
+          )}
+        </AnimatePresence>
       </main>
 
-      {/* Modals & Inputs */}
-      <input 
-        type="file" 
-        ref={fileInputRef} 
-        onChange={handleFileImport} 
-        accept=".json" 
-        className="hidden" 
-      />
+      {/* Bottom Navigation for Mobile */}
+      <nav className={`lg:hidden fixed bottom-0 left-0 right-0 z-30 border-t shadow-[0_-4px_12px_rgba(0,0,0,0.05)] ${themeClasses.bgCard} ${themeClasses.border} flex justify-around items-center h-16 px-2 pb-safe`}>
+        <button 
+          onClick={() => { setSelectedRecipe(null); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+          className={`flex flex-col items-center justify-center gap-1 w-full h-full transition-colors ${!selectedRecipe ? themeClasses.icon : 'text-gray-400'}`}
+        >
+          <ChefHatIcon className="h-6 w-6" />
+          <span className="text-[10px] font-medium">{t('home')}</span>
+        </button>
+        <button 
+          onClick={() => setIsSavedRecipesModalOpen(true)}
+          className="flex flex-col items-center justify-center gap-1 w-full h-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+        >
+          <BookmarkIcon className="h-6 w-6" />
+          <span className="text-[10px] font-medium">{t('saved')}</span>
+        </button>
+        <button 
+          onClick={() => setIsSettingsModalOpen(true)}
+          className="flex flex-col items-center justify-center gap-1 w-full h-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+        >
+          <SettingsIcon className="h-6 w-6" />
+          <span className="text-[10px] font-medium">{t('settings')}</span>
+        </button>
+      </nav>
 
+      {/* Modals */}
       <SettingsModal isOpen={isSettingsModalOpen} onClose={() => setIsSettingsModalOpen(false)} settings={settings} onSettingsChange={handleSettingsChange} />
       <ImageModal imageUrl={enlargedImageUrl} onClose={() => setEnlargedImageUrl(null)} t={t} />
       <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} onAuth={handleAuth} settings={settings} />
       {user && <UserActionsModal isOpen={isUserActionsModalOpen} onClose={() => setIsUserActionsModalOpen(false)} onAction={(action) => { if (action === 'changePassword') setIsChangePasswordModalOpen(true); setIsUserActionsModalOpen(false); }} onLogout={handleLogout} userName={user.name} settings={settings} />}
       <ChangePasswordModal isOpen={isChangePasswordModalOpen} onClose={() => setIsChangePasswordModalOpen(false)} onChangePassword={() => alert('Password changed!')} settings={settings} />
-      <SavedRecipesModal 
-        isOpen={isSavedRecipesModalOpen} 
-        onClose={() => setIsSavedRecipesModalOpen(false)} 
-        savedMenus={savedMenus} 
-        onLoadMenu={handleLoadMenu} 
-        onClear={() => setSavedMenus([])} 
-        onDeleteMenu={(index) => setSavedMenus(prev => prev.filter((_, idx) => idx !== index))}
-        onImportLibrary={handleImportLibrary} 
-        settings={settings} 
-        t={t} 
-      />
+      <SavedRecipesModal isOpen={isSavedRecipesModalOpen} onClose={() => setIsSavedRecipesModalOpen(false)} savedMenus={savedMenus} onLoadMenu={handleLoadMenu} onClear={() => setSavedMenus([])} settings={settings} t={t} />
+      <VideoPromoModal isOpen={isVideoPromoModalOpen} onClose={() => setIsVideoPromoModalOpen(false)} settings={settings} t={t} />
+      <ChefTipsModal isOpen={isChefTipsModalOpen} onClose={() => setIsChefTipsModalOpen(false)} settings={settings} t={t} />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { getThemeClasses } from '../utils/themeUtils';
 import { ClockIcon } from './icons/ClockIcon';
 import { StarIcon } from './icons/StarIcon';
 import { EyeIcon } from './icons/EyeIcon';
+import Pronunciation from './Pronunciation';
 
 interface RecipeCardProps {
   recipe: Recipe;
@@ -54,16 +55,13 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({ recipe, onSelect, isSele
       >
         <StarIcon solid={!!recipe.isFavorite} className="h-5 w-5" />
       </button>
-      <div className="flex items-start gap-4">
-        <div className="relative w-24 h-24 rounded-lg flex-shrink-0 overflow-hidden shadow-sm">
+      <div className="flex items-start gap-3 sm:gap-4">
+        <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-lg flex-shrink-0 overflow-hidden shadow-sm">
              {
                 (() => {
                     switch (recipe.dishImageStatus) {
                         case 'loaded':
-                            const imgSrc = recipe.dishImage?.startsWith('http') || recipe.dishImage?.startsWith('data:') 
-                                ? recipe.dishImage 
-                                : `data:image/jpeg;base64,${recipe.dishImage}`;
-                            return <img src={imgSrc} alt={recipe.dishName} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />;
+                            return <img src={`data:image/jpeg;base64,${recipe.dishImage}`} alt={recipe.dishName} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />;
                         case 'pending':
                             return (
                                 <div className="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
@@ -71,9 +69,12 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({ recipe, onSelect, isSele
                                 </div>
                             );
                         case 'failed':
+                        case 'quota_exceeded':
                             return (
                                 <div className="w-full h-full bg-red-100 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded-lg flex flex-col items-center justify-center text-center p-2">
-                                    <p className="text-xs text-red-600 dark:text-red-400 font-semibold">{t('imageFailed')}</p>
+                                    <p className="text-xs text-red-600 dark:text-red-400 font-semibold">
+                                        {recipe.dishImageStatus === 'quota_exceeded' ? t('quotaExceeded') : t('imageFailed')}
+                                    </p>
                                     <button onClick={(e) => { e.stopPropagation(); onRegenerateImage(); }} className={`mt-1 text-xs px-2 py-1 rounded ${themeClasses.buttonPrimary} text-white`}>
                                         {t('tryAgain')}
                                     </button>
@@ -94,14 +95,44 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({ recipe, onSelect, isSele
              </div>
         </div>
         <div className="flex-grow">
-          <h3 className={`font-bold font-heading text-lg ${themeClasses.textHeader}`}>{recipe.dishName}</h3>
+          <div className="flex items-center gap-1">
+            <h3 className={`font-bold font-heading text-lg ${themeClasses.textHeader}`}>{recipe.dishName}</h3>
+            {recipe.dishNamePronunciation && (
+              <Pronunciation text={recipe.dishNamePronunciation} lang={settings.language} t={t} size="sm" />
+            )}
+          </div>
           <p className={`text-sm ${themeClasses.textSecondary} line-clamp-2 mt-1`}>{recipe.description}</p>
+          
+          <div className="mt-2 flex flex-wrap gap-1">
+            {recipe.ingredients.slice(0, 3).map((ing, idx) => (
+              <div key={idx} className={`flex items-center gap-0.5 text-[10px] px-2 py-0.5 rounded-full bg-black/5 dark:bg-white/5 ${themeClasses.textSecondary}`}>
+                <span>{ing.name}</span>
+                <Pronunciation text={ing.pronunciation || ing.name} lang={settings.language} t={t} size="sm" />
+              </div>
+            ))}
+            {recipe.ingredients.length > 3 && (
+              <span className={`text-[10px] ${themeClasses.textSecondary} flex items-center`}>...</span>
+            )}
+          </div>
+
           <div className="flex items-center gap-4 mt-2 text-xs">
+            {recipe.rating && recipe.rating > 0 && (
+                <div className="flex items-center gap-1 text-yellow-500 font-bold" title={`${recipe.rating.toFixed(1)} stars (${recipe.ratingCount} ratings)`}>
+                    <StarIcon solid={true} className="h-4 w-4" />
+                    <span>{recipe.rating.toFixed(1)}</span>
+                    <span className="text-gray-400 font-normal">({recipe.ratingCount})</span>
+                </div>
+            )}
             {recipe.cookingTime && (
                 <div className={`flex items-center gap-1.5 ${themeClasses.textSecondary}`} title={t('cookingTime')}>
                     <ClockIcon className="h-4 w-4" />
                     <span>{recipe.cookingTime}</span>
                 </div>
+            )}
+            {recipe.cuisine && (
+                <span className={`px-2 py-0.5 rounded-full font-semibold bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300`}>
+                    {recipe.cuisine}
+                </span>
             )}
             {recipe.difficulty && (
                 <span className={`px-2 py-0.5 rounded-full font-semibold ${getDifficultyClass(recipe.difficulty)}`}>

@@ -3,12 +3,12 @@
   <head>
     <meta charset="utf-t" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>AI Chef God</title>
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#10B981" />
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Chef God">
     <link rel="apple-touch-icon" href="/icon-192.png">
     <script src="https://cdn.tailwindcss.com"></script>
@@ -16,21 +16,32 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:ital,wght@0,400..700;1,400..700&display=swap" rel="stylesheet">
     <style>
+      :root {
+        --theme-color-accent: #10B981;
+      }
       .font-body { font-family: 'Inter', sans-serif; }
       .font-heading { font-family: 'Lora', serif; }
-      /* Custom scrollbar for a more modern look */
-      ::-webkit-scrollbar { width: 8px; }
+      
+      /* Custom scrollbar */
+      ::-webkit-scrollbar { width: 6px; }
       ::-webkit-scrollbar-track { background: transparent; }
-      html.dark ::-webkit-scrollbar-thumb { background: #4a5568; border-radius: 4px; }
-      html.light ::-webkit-scrollbar-thumb { background: #a0aec0; border-radius: 4px; }
-      ::-webkit-scrollbar-thumb:hover { background: #718096; }
+      html.dark ::-webkit-scrollbar-thumb { background: #4a5568; border-radius: 3px; }
+      html.light ::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 3px; }
+      
       body {
-        /* Smooth scrolling for better UX */
         scroll-behavior: smooth;
-        /* Prevent pull-to-refresh on mobile which can feel un-app-like */
         overscroll-behavior-y: none;
+        -webkit-tap-highlight-color: transparent;
+        padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
       }
-      /* Custom list styling for recipe steps */
+
+      .pt-safe { padding-top: env(safe-area-inset-top); }
+      .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+      .mt-safe { margin-top: env(safe-area-inset-top); }
+      .mb-safe { margin-bottom: env(safe-area-inset-bottom); }
+      .pb-safe-offset-6 { padding-bottom: calc(env(safe-area-inset-bottom) + 1.5rem); }
+
+      /* Mobile-optimized recipe steps */
       .recipe-steps ol {
         counter-reset: step-counter;
         list-style: none;
@@ -40,26 +51,36 @@
         counter-increment: step-counter;
         display: flex;
         align-items: flex-start;
-        margin-bottom: 1.5rem; /* More spacing between steps */
+        margin-bottom: 1.25rem;
       }
       .recipe-steps li::before {
         content: counter(step-counter);
         font-family: 'Lora', serif;
         font-weight: bold;
-        font-size: 1.25rem;
-        line-height: 1.5rem;
+        font-size: 1rem;
+        line-height: 1rem;
         color: white;
-        background-color: var(--theme-color-accent, #10B981); /* Default to green */
+        background-color: var(--theme-color-accent);
         border-radius: 50%;
-        min-width: 2.5rem;
-        height: 2.5rem;
+        min-width: 2rem;
+        height: 2rem;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        margin-right: 1rem;
+        margin-right: 0.875rem;
         flex-shrink: 0;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
       }
-      /* Animation for 'Link Copied' tooltip */
+
+      /* Touch target improvements */
+      button, a {
+        min-height: 44px;
+        min-width: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+
       @keyframes fadeInOut {
         0%, 100% { opacity: 0; transform: translateY(5px); }
         10%, 90% { opacity: 1; transform: translateY(0); }

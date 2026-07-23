@@ -1,3 +1,5 @@
+import { GoogleGenAI, Modality } from "@google/genai";
+
 // Following Gemini API guidelines for audio decoding
 function decode(base64: string): Uint8Array {
   const binaryString = atob(base64);
@@ -15,8 +17,10 @@ async function decodeAudioData(
   sampleRate: number,
   numChannels: number,
 ): Promise<AudioBuffer> {
-  const dataInt16 = new Int16Array(data.buffer);
-  const frameCount = dataInt16.length / numChannels;
+  // Ensure we don't try to read past the end of the buffer if it's odd-lengthed
+  const numSamples = Math.floor(data.byteLength / 2);
+  const dataInt16 = new Int16Array(data.buffer, data.byteOffset, numSamples);
+  const frameCount = Math.floor(numSamples / numChannels);
   const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
 
   for (let channel = 0; channel < numChannels; channel++) {
@@ -37,28 +41,57 @@ const getAudioContext = (): AudioContext => {
     return audioContext;
 };
 
+// Fix: Initialize GoogleGenAI with named apiKey parameter using GEMINI_API_KEY
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+
+const getLanguageName = (code: string): string => {
+    const names: Record<string, string> = {
+        'en': 'English',
+        'es': 'Spanish',
+        'fr': 'French',
+        'zh-CN': 'Chinese (Simplified)',
+        'zh-TW': 'Chinese (Traditional)'
+    };
+    return names[code] || 'English';
+};
+
 export const generateAndPlayAudio = async (text: string, lang: string): Promise<void> => {
     try {
-        const response = await fetch("/api/generate-audio", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
+        const languageName = getLanguageName(lang);
+        // Fix: Use ai.models.generateContent for TTS with a clearer prompt
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash-preview-tts",
+            contents: [{ parts: [{ text: `Please say the following text in ${languageName}: ${text}` }] }],
+            config: {
+                responseModalities: [Modality.AUDIO],
+                speechConfig: {
+                    voiceConfig: {
+                        prebuiltVoiceConfig: { voiceName: 'Kore' }, // A versatile voice
+                    },
+                },
             },
-            body: JSON.stringify({ text, lang }),
         });
-
-        if (!response.ok) {
-            const errData = await response.json();
-            throw new Error(errData.error || "Failed to generate audio from server");
+        
+        let base64Audio: string | undefined;
+        if (response.candidates?.[0]?.content?.parts) {
+            for (const part of response.candidates[0].content.parts) {
+                if (part.inlineData?.data) {
+                    base64Audio = part.inlineData.data;
+                    break;
+                }
+            }
         }
 
-        const data = await response.json();
-        const base64Audio = data.base64Audio;
         if (!base64Audio) {
+            console.error("Gemini API Response:", JSON.stringify(response, null, 2));
             throw new Error("No audio data received from API.");
         }
 
         const ctx = getAudioContext();
+        if (ctx.state === 'suspended') {
+            await ctx.resume();
+        }
+
         const audioBuffer = await decodeAudioData(
             decode(base64Audio),
             ctx,
@@ -73,5 +106,6 @@ export const generateAndPlayAudio = async (text: string, lang: string): Promise<
 
     } catch (error) {
         console.error("Error generating or playing audio:", error);
+        throw error; // Re-throw to be caught by the component
     }
 };

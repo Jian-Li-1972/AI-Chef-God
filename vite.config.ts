@@ -13,8 +13,9 @@ export default defineConfig(({ mode }) => {
     // Critical for GitHub Pages: usually '/repo-name/' but './' works for non-routed apps
     base: './', 
     define: {
-      // This allows 'process.env.API_KEY' to work in the browser by replacing it with the actual value during build
-      'process.env.API_KEY': JSON.stringify(process.env.API_KEY || env.API_KEY)
+      // This allows 'process.env.GEMINI_API_KEY' to work in the browser by replacing it with the actual value during build
+      'process.env.GEMINI_API_KEY': JSON.stringify(process.env.GEMINI_API_KEY || env.GEMINI_API_KEY || process.env.API_KEY || env.API_KEY),
+      'process.env.API_KEY': JSON.stringify(process.env.GEMINI_API_KEY || env.GEMINI_API_KEY || process.env.API_KEY || env.API_KEY)
     }
   }
 })

@@ -1,7 +1,7 @@
 import { GoogleGenAI, Modality, Type } from "@google/genai";
 import { Recipe, Settings } from "../types";
 
-// Initialize GoogleGenAI with named apiKey parameter supporting Vite and process envs
+// 初始化 GoogleGenAI，自动读取环境变量（兼容 Vite 与标准 process.env）
 const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || '';
 const ai = new GoogleGenAI({ apiKey });
 

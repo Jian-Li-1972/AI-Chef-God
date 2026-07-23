@@ -1,10 +1,9 @@
-
-
 import { GoogleGenAI, Modality, Type } from "@google/genai";
 import { Recipe, Settings } from "../types";
 
-// Fix: Initialize GoogleGenAI with named apiKey parameter using GEMINI_API_KEY
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+// Initialize GoogleGenAI with named apiKey parameter supporting Vite and process envs
+const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || '';
+const ai = new GoogleGenAI({ apiKey });
 
 const recipeSchema = {
     type: Type.ARRAY,
@@ -119,7 +118,7 @@ export const generateRecipesFromImage = async (
 
   try {
     const response = await retryWithBackoff(() => ai.models.generateContent({
-      model: 'gemini-2.5-pro',
+      model: 'gemini-1.5-flash',
       contents: { parts: [imagePart, textPart] },
       config: {
         responseMimeType: "application/json",
@@ -147,7 +146,7 @@ export const generateDishImage = async (
   
   try {
     const response = await retryWithBackoff(() => ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
+      model: 'gemini-1.5-flash',
       contents: {
         parts: [
           {

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>AI Chef God</title>
+    <meta name="description" content="Upload a photo of your ingredients, and let the AI Chef God generate three chef-level dishes with step-by-step cooking instructions." />
+    <meta property="og:title" content="AI Chef God" />
+    <meta property="og:description" content="Upload a photo of your ingredients, and let the AI Chef God generate three chef-level dishes with step-by-step cooking instructions." />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#10B981" />
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Chef God">
+    <link rel="apple-touch-icon" href="/icon-192.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:ital,wght@0,400..700;1,400..700&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --theme-color-accent: #10B981;
+      }
+      .font-body { font-family: 'Inter', sans-serif; }
+      .font-heading { font-family: 'Lora', serif; }
+      
+      /* Custom scrollbar */
+      ::-webkit-scrollbar { width: 6px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      html.dark ::-webkit-scrollbar-thumb { background: #4a5568; border-radius: 3px; }
+      html.light ::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 3px; }
+      
+      body {
+        scroll-behavior: smooth;
+        overscroll-behavior-y: none;
+        -webkit-tap-highlight-color: transparent;
+        padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+      }
+
+      .pt-safe { padding-top: env(safe-area-inset-top); }
+      .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+      .mt-safe { margin-top: env(safe-area-inset-top); }
+      .mb-safe { margin-bottom: env(safe-area-inset-bottom); }
+      .pb-safe-offset-6 { padding-bottom: calc(env(safe-area-inset-bottom) + 1.5rem); }
+
+      /* Mobile-optimized recipe steps */
+      .recipe-steps ol {
+        counter-reset: step-counter;
+        list-style: none;
+        padding-left: 0;
+      }
+      .recipe-steps li {
+        counter-increment: step-counter;
+        display: flex;
+        align-items: flex-start;
+        margin-bottom: 1.25rem;
+      }
+      .recipe-steps li::before {
+        content: counter(step-counter);
+        font-family: 'Lora', serif;
+        font-weight: bold;
+        font-size: 1rem;
+        line-height: 1rem;
+        color: white;
+        background-color: var(--theme-color-accent);
+        border-radius: 50%;
+        min-width: 2rem;
+        height: 2rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 0.875rem;
+        flex-shrink: 0;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      }
+
+      /* Touch target improvements */
+      button, a {
+        min-height: 44px;
+        min-width: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      @keyframes fadeInOut {
+        0%, 100% { opacity: 0; transform: translateY(5px); }
+        10%, 90% { opacity: 1; transform: translateY(0); }
+      }
+      .animate-fade-in-out {
+        animation: fadeInOut 2s ease-in-out forwards;
+      }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "vite": "https://aistudiocdn.com/vite@^7.2.4",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/"
+  }
+}
+</script>
+</head>
+  <body class="bg-gray-900 text-gray-200">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
